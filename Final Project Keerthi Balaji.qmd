@@ -1,0 +1,327 @@
+---
+title: "Final Project"
+author: "Keerthi Balaji"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(haven)
+library(ggplot2)
+library(rstatix)
+library(tidyverse)
+library(skimr)
+library(descr)
+library(labelled)
+library(stargazer)
+library(jtools)
+library(ggeffects)
+library(corrplot)
+
+```
+
+1.  Histograms Task: Create histograms of each continuous variable in the UN11 dataset.
+
+```{r}
+
+library(alr4)
+names(UN11)
+head(UN11)
+
+```
+
+**continuous variables: fertility, ppgdp, pctUrban, lifeExpF**
+
+```{r}
+
+#histogram of fertility
+ggplot(UN11, aes(x = fertility)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Fertility",
+       x = "Fertility",
+       y = "Density") +
+  theme_minimal()
+
+#histogram of ppdgp
+ggplot(UN11, aes(x = ppgdp)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Per capita gross domestic product in US dollars",
+       x = "ppgdp",
+       y = "Density") +
+  theme_minimal()
+
+#histogram of pctUrban
+ggplot(UN11, aes(x = pctUrban)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Percent Urban",
+       x = "Percent Urban",
+       y = "Density") +
+  theme_minimal()
+
+#histogram of lifeExpF
+ggplot(UN11, aes(x = lifeExpF)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Female life expectancy, years",
+       x = "Female life expectancy, years",
+       y = "Density") +
+  theme_minimal()
+
+
+
+```
+
+Inspect the histograms and decide if any variables should be transformed (e.g., log transformation).
+
+**PPGDP and Fertility will probably need to be natural log transformed, as it is skewed to the right.**
+
+```{r}
+UN11 <- UN11 %>%
+  mutate(
+    ppgdp_ln = log(ppgdp),
+    fertility_ln = log(fertility)
+  )
+
+#histogram of fertility
+ggplot(UN11, aes(x = fertility_ln)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Fertility (natural log transformed)",
+       x = "Fertility",
+       y = "Density") +
+  theme_minimal()
+
+#histogram of ppdgp
+ggplot(UN11, aes(x = ppgdp_ln)) +
+  geom_histogram(aes(y = after_stat(density)), position = "identity", bins = 30, alpha = 0.25, color="black") +
+  labs(title = "Histogram Plot of Per capita gross domestic product in US dollars (natural log transformed)",
+       x = "ppgdp",
+       y = "Density") +
+  theme_minimal()
+
+
+
+```
+
+2.  ANOVA Analysis
+
+Task: Run an ANOVA with lifeExpF as the dependent variable (DV) and group as the independent variable (IV).
+
+```{r}
+means<-UN11 %>%  
+  group_by(group) %>%
+  summarise(mean = mean(lifeExpF),
+            var = var(lifeExpF), 
+            sd = sd(lifeExpF),
+            n=n())
+
+print(means)
+
+anova_result <- aov(lifeExpF ~ as.factor(group), data = UN11)
+
+print(summary(anova_result))
+
+```
+
+Conduct a posthoc comparison using either Bonferroni or Tukey HSD.
+
+```{r}
+tukey_result <- TukeyHSD(anova_result)
+print(tukey_result)
+```
+
+Interpret the results of the ANOVA and posthoc comparisons.
+
+**There are significant differences in the mean of the DV between the levels of the independent variable because the p value is statistically significant. Because all three p values are \< 0.05, there is a statistically significant difference between the life expectancies of all three groups.**
+
+3.  Correlations
+
+Task: Run Pearson R correlations between the continuous variables
+
+```{r}
+
+r_select <- cor(UN11$fertility_ln, UN11$ppgdp_ln, method = "pearson")
+
+r_select2 <- cor(UN11$fertility_ln, UN11$pctUrban, method = "pearson")
+
+r_select3 <- cor(UN11$ppgdp_ln, UN11$pctUrban, method = "pearson")
+
+
+r_select
+r_select2
+r_select3
+
+```
+
+Create a correlation matrix between the continuous variables in the dataset
+
+```{r}
+UN11_cor <- UN11 %>% select(-c(region, group))
+
+r_all <-cor(UN11_cor, method="pearson", use="complete.obs")
+num<-corrplot(r_all, method = 'number') 
+```
+
+```{r}
+lm1<-lm(fertility_ln~ppgdp_ln, data=UN11)
+summary(lm1)
+
+lm2<-lm(ppgdp_ln~fertility_ln, data=UN11)
+summary(lm2)
+
+```
+
+Discuss what you see in the matrix including direction and strength of the bivariate correlation.
+
+**Fertility and ppgdp are megatively correlated at -0.73. Fertility and urban population are negatively correlated at -0.54. Urban population and ppgdp are positively correlated at 0.75. This means that all variables are moderately correlated, suggesting possible multicolinearity. Life expectancy is negatively correlated with fertility and positively correlated with urban population and ppgdp, suggesting as the urban population and ppgdp increase, so does life expectancy. On the other hand, the negative correlation with fertility suggests that, as life expectancy increases, fertility decreases.**
+
+4.  OLS Model Estimation Task: Create hypotheses for the continuous IVs and estimate an OLS model with lifeExpF as the DV and fertility, pctUrban, ppgdp as the IVs (or their transformed versions).
+
+Instructions:
+
+Create hypotheses for the effect of fertility, pctUrban, and ppgdp on lifeExpF.
+
+**H0: ppgdp, fertility, and pctUrban do not have an effect on life expectancy**
+
+**Ha: A higher ppgdp and pctUrban and a lower fertility will increase life expectancy.**
+
+Decide if region and group should both be included in the model.
+
+**Region and group should nto be included in the model because they are not continous variables.**
+
+Estimate an OLS model using the lm function.
+
+```{r}
+multi_ols<-lm(lifeExpF ~ fertility_ln +  pctUrban + ppgdp_ln , data=UN11)
+summary(multi_ols)
+
+```
+
+Review OLS assumptions (e.g., linearity, normality, homoscedasticity, multicollinearity, outliers). Explain what you see and if any are violated.
+
+```{r}
+#Assumption of Linearity Tests
+
+b <- ggplot(UN11, aes(x = fertility_ln, y = lifeExpF))
+
+b + geom_point(size=2) +
+  theme_bw(base_size = 20) + theme_minimal()+  
+  theme(legend.position="bottom") +
+  guides(fill=guide_legend(title=NULL))+
+  geom_smooth(method = "loess", se=FALSE, span=.8)
+
+c <- ggplot(UN11, aes(x = ppgdp_ln, y = lifeExpF))
+
+c + geom_point(size=2) +
+  theme_bw(base_size = 20) + theme_minimal()+  
+  theme(legend.position="bottom") +
+  guides(fill=guide_legend(title=NULL))+
+  geom_smooth(method = "loess", se=FALSE, span=.8)
+
+c <- ggplot(UN11, aes(x = pctUrban, y = lifeExpF))
+
+c + geom_point(size=2) +
+  theme_bw(base_size = 20) + theme_minimal()+  
+  theme(legend.position="bottom") +
+  guides(fill=guide_legend(title=NULL))+
+  geom_smooth(method = "loess", se=FALSE, span=.8)
+```
+
+**All three plots are mostly linear.**
+
+```{r}
+#Multicolinearity Test
+
+library(car)
+
+
+vif(multi_ols)
+
+```
+
+**All three VIFs \< 5, suggesting no high multicolinearity.**
+
+```{r}
+#Other assumptions
+plot(multi_ols, which=1:6)
+```
+
+**Rssiduals vs Fitted and Scale-location are a mostly straight line suggesting no heteroskedacity. The residuals are mostly normally distributed. Looking at the cook's distance, it appears that Eq Guinea, Nauru, and Swaziland are possible outliers, so they will be removed.**
+
+Make necessary changes if any assumptions are violated and reestimate the model.
+
+```{r}
+
+#cleandata <- UN11[-c("Swaziland", "Equatorial Guinea", "Nauru"), ]
+
+cleandata <- UN11[-c(172, 58, 125), ]
+
+
+cleaned_model <- lm(lifeExpF ~ fertility_ln +  pctUrban + ppgdp_ln, data=cleandata)
+
+stargazer(multi_ols, cleaned_model, digits=3, type="text") 
+
+```
+
+
+With your "final model", create a regression table using stargazer or jtools with appropriately named variables (i.e. do not use the names directly from the dataset)
+
+```{r}
+stargazer (cleaned_model, type="text", round=3, single.row = TRUE, dep.var.labels=c("Life Expectancy"), covariate.labels=c("Fertility", "Urban Population", "Per capita gross domestic product in USD"))
+```
+
+5.  Model Interpretation
+
+Task: Fully interpret the final OLS model results.
+
+**As life expectancy increases by one year, fertility (# of children per woman) goes down by 11.272, and is statistically significant because it has a p value \< 0.01. As life expectancy increases by one year, ppgdp goes up by 2.556, and is statistically significant because it has a p value \< 0.01. Urban population does not appear to be statistically significant.**
+
+Discuss beta weights and any significance found in the model.
+
+**Only fertility and ppgdp have statistical significance (p \< 0.01).**
+
+Discuss the model fit statistics and what this tells us about your final model. Present a clear and concise interpretation of the results.
+
+**R2 is 0.763 and adjusted R2 is 0.759, suggesting a decent correlation. The standard error is 4.856. The F statistic is 206.029 and is statistically significant, providing stronger evidence against H0.**
+
+6.  Predicted Value Plots Task: Create predicted value plots for all significant predictor variables from your final model using ggpredict from the ggeffects package.
+
+Ensure the plots have appropriate colors, names on the axes, and confidence intervals.
+
+```{r}
+continuous<-ggpredict(cleaned_model, terms=c("fertility_ln")) 
+
+p1 <- ggplot(continuous, aes(x = x, y = predicted)) +
+  geom_line(color = "purple") +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.05) +
+  labs(title = "Predicted Life Expectancy vs Fertility",
+       x = "Fertility",
+       y = "Predicted Life Expectancy") +
+  theme_minimal() +
+  scale_x_continuous()
+
+
+p1
+
+continuous<-ggpredict(cleaned_model, terms=c("ppgdp_ln")) 
+
+p1 <- ggplot(continuous, aes(x = x, y = predicted)) +
+  geom_line(color = "red") +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = 0.05) +
+  labs(title = "Predicted Life Expectancy vs ppgdp",
+       x = "Per capita gross domestic product in USD",
+       y = "Predicted Life Expectancy") +
+  theme_minimal() +
+  scale_x_continuous()
+
+
+p1
+```
+
+Describe what the plots reveal about the relationships between the variables.
+
+**As life expectancy increases, fertility decreases and ppdgp increases.**
+
+7.  Draw Conclusions
+
+Task: Finish the assignment by drawing conclusions about what is influential in life expectancy based on your interpretation of your OLS model and predicted value plots.
+
+**Based on the OLS model and predicted value plots, the higher fertility, the lower life expectancy. In addition, the higher your country's ppgdp, the higher your life expectancy is. This seems to be rational, as a higher ppgdp means a wealthier country, and wealthy countries tend to have greater access to healthcare. In addition, since life expectancy is only measuring female life expectancy, it makes sense that the less children you have, the longer you live, as childbirth can cause other medical complications.**
